@@ -1,8 +1,4 @@
-"""ORM Models package.
-
-Import all models here so Alembic can discover them via Base.metadata.
-"""
-
 from app.models.base import Base
+from app.models.user import User, UserRole
 
-__all__ = ["Base"]
+__all__ = ["Base", "User", "UserRole"]
