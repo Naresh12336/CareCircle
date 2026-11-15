@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import health, auth
+from app.api.v1.endpoints import health, auth, care_profiles
 
 api_router = APIRouter()
 
@@ -15,4 +15,10 @@ api_router.include_router(
     auth.router,
     prefix="/auth",
     tags=["Authentication"],
+)
+
+api_router.include_router(
+    care_profiles.router,
+    prefix="/care-profiles",
+    tags=["Care Profiles"],
 )
