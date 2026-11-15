@@ -1,189 +1,298 @@
-import React, { useState, useEffect } from 'react'
-import { HeartPulse, ShieldCheck, Activity, Pill, Users, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react'
+
+import { useEffect, useState } from 'react'
+import {
+  Heart, LayoutDashboard, Pill, Activity,
+  CalendarDays, LogOut, Plus, CheckCircle2,
+  Clock, AlertCircle
+} from 'lucide-react'
+import HealthRecords from './HealthRecords'
+import Appointments from './Appointments'
+import api from './api'
 
 export default function App() {
-  const [healthStatus, setHealthStatus] = useState({
-    loading: true,
-    data: null,
-    error: null,
-  })
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [medications, setMedications] = useState([])
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [tab, setTab] = useState('dashboard')
 
-  const checkHealth = async () => {
-    setHealthStatus({ loading: true, data: null, error: null })
-    try {
-      const response = await fetch('/api/v1/health')
-      if (!response.ok) {
-        throw new Error(`Health check returned status ${response.status}`)
-      }
-      const data = await response.json()
-      setHealthStatus({ loading: false, data, error: null })
-    } catch (err) {
-      setHealthStatus({
-        loading: false,
-        data: null,
-        error: err.message || 'Unable to connect to FastAPI backend',
-      })
-    }
+  async function loadDashboard() {
+    const [userResponse, profileResponse, medicationResponse] =
+      await Promise.all([
+        api.get('/auth/me'),
+        api.get('/care-profiles/me'),
+        api.get('/medications'),
+      ])
+
+    setUser(userResponse.data)
+    setProfile(profileResponse.data)
+    setMedications(medicationResponse.data)
   }
 
   useEffect(() => {
-    checkHealth()
+    if (localStorage.getItem('carecircle_token')) {
+      loadDashboard().catch(() => {
+        localStorage.removeItem('carecircle_token')
+      })
+    }
   }, [])
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-teal-50/20 to-slate-100 text-slate-800">
-      {/* Navigation Header */}
-      <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white shadow-sm shadow-teal-600/30">
-              <HeartPulse className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-slate-900">CareCircle</span>
-              <span className="hidden sm:inline-block ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-teal-100 text-teal-800">
-                Phase 1 Foundation
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <ShieldCheck className="w-4 h-4 text-teal-600" />
-            <span>Hackathon Edition</span>
-          </div>
-        </div>
-      </header>
+  async function login(event) {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
 
-      {/* Hero Section */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-100 text-teal-800 text-sm font-medium mb-4">
-            <Activity className="w-4 h-4" />
-            <span>Elderly Care & Medication Management Platform</span>
+    try {
+      const response = await api.post('/auth/login', {
+        email,
+        password,
+      })
+
+      localStorage.setItem(
+        'carecircle_token',
+        response.data.access_token
+      )
+
+      await loadDashboard()
+    } catch (err) {
+      setError(
+        err.response?.data?.detail || 'Unable to login.'
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('carecircle_token')
+    setUser(null)
+    setProfile(null)
+    setMedications([])
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-screen flex items-center justify-center p-6">
+        <form
+          onSubmit={login}
+          className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md space-y-5"
+        >
+          <div className="flex items-center gap-3 text-emerald-700">
+            <Heart size={36} />
+            <h1 className="text-3xl font-bold">CareCircle</h1>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
-            Compassionate Care, <br className="hidden sm:block" />
-            <span className="text-teal-600">Simpler Living for Seniors</span>
-          </h1>
-          <p className="mt-4 text-lg text-slate-600 leading-relaxed">
-            CareCircle bridges the gap between seniors, caregivers, and families with accessible medication schedules,
-            secure passcode-based access, and smart non-clinical assistance.
+
+          <p className="text-gray-500">
+            Your health, supported by the people who care.
           </p>
-        </div>
 
-        {/* Backend Connectivity Card */}
-        <div className="max-w-2xl mx-auto mb-16 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-pulse" />
-              <h2 className="font-semibold text-slate-800 text-base">Backend API Health Status</h2>
-            </div>
-            <button
-              onClick={checkHealth}
-              disabled={healthStatus.loading}
-              className="text-xs font-medium text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {healthStatus.loading ? 'Checking...' : 'Refresh Status'}
-            </button>
+          <div>
+            <label className="block mb-2 font-medium">Email</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full border rounded-lg p-3"
+              placeholder="Enter your email"
+            />
           </div>
 
-          {healthStatus.loading && (
-            <div className="py-6 text-center text-sm text-slate-500">
-              Connecting to FastAPI health endpoint at <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">/api/v1/health</code>...
-            </div>
+          <div>
+            <label className="block mb-2 font-medium">Password</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full border rounded-lg p-3"
+              placeholder="Enter your password"
+            />
+          </div>
+
+          {error && (
+            <p className="text-red-600 text-sm">{error}</p>
           )}
 
-          {healthStatus.data && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg text-sm font-medium">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Backend service is online & healthy</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <span className="text-slate-500 block text-xs">Project</span>
-                  <span className="font-semibold text-slate-800">{healthStatus.data.project}</span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <span className="text-slate-500 block text-xs">Version</span>
-                  <span className="font-semibold text-slate-800">v{healthStatus.data.version}</span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <span className="text-slate-500 block text-xs">Environment</span>
-                  <span className="font-semibold text-slate-800 capitalize">{healthStatus.data.environment}</span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <span className="text-slate-500 block text-xs">PostgreSQL Status</span>
-                  <span className={`font-semibold capitalize ${healthStatus.data.database === 'connected' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {healthStatus.data.database} (configured)
-                  </span>
-                </div>
-              </div>
-              <div className="text-[11px] text-slate-400 text-right">
-                Checked: {new Date(healthStatus.data.timestamp).toLocaleTimeString()}
-              </div>
-            </div>
-          )}
-
-          {healthStatus.error && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs sm:text-sm text-amber-800 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium">Backend not connected yet</p>
-                <p className="text-amber-700 text-xs mt-0.5">
-                  Start the FastAPI server on port 8000 (<code className="bg-amber-100/70 px-1 rounded">uvicorn app.main:app --reload</code>) to test live communication.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Upcoming Platform Modules (Architecture Previews) */}
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center mb-3">
-              <Pill className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-slate-900 mb-1">Medication Management</h3>
-            <p className="text-sm text-slate-600 mb-3">
-              Schedules, dosage alerts, and prescription label OCR parsing via Tesseract.
-            </p>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-              Scheduled for Phase 2
-            </span>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center mb-3">
-              <Users className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-slate-900 mb-1">Secure Passcode Portal</h3>
-            <p className="text-sm text-slate-600 mb-3">
-              Frictionless, high-accessibility authentication tailored for seniors and caregivers with role-based access.
-            </p>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-              Scheduled for Phase 2
-            </span>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center mb-3">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-slate-900 mb-1">Non-Clinical Assistant</h3>
-            <p className="text-sm text-slate-600 mb-3">
-              Powered by Gemini API for gentle routine reminders and everyday wellness support without clinical diagnosis.
-            </p>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-              Scheduled for Phase 2
-            </span>
-          </div>
-        </div>
+          <button
+            disabled={loading}
+            className="w-full bg-emerald-700 text-white p-3 rounded-lg font-semibold"
+          >
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
       </main>
+    )
+  }
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 mt-20 py-8 bg-white text-center text-sm text-slate-500">
-        <p>CareCircle &copy; 2026 &bull; Elderly Care & Medication Management &bull; Built for Hackathon</p>
-      </footer>
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'medications', label: 'Medications', icon: Pill },
+    { id: 'health', label: 'Health Records', icon: Activity },
+    { id: 'appointments', label: 'Appointments', icon: CalendarDays },
+  ]
+
+  return (
+    <div className="min-h-screen flex bg-gray-50">
+      <aside className="w-64 bg-white border-r p-6 hidden md:flex flex-col">
+        <div className="flex items-center gap-2 text-emerald-700 mb-10">
+          <Heart size={28} />
+          <span className="text-2xl font-bold">CareCircle</span>
+        </div>
+
+        <nav className="space-y-2">
+          {navItems.map(item => {
+            const Icon = item.icon
+            return (
+              <button
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg text-left ${
+                  tab === item.id
+                    ? 'bg-emerald-50 text-emerald-800 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={20} />
+                {item.label}
+              </button>
+            )
+          })}
+        </nav>
+
+        <button
+          onClick={logout}
+          className="mt-auto flex items-center gap-3 p-3 text-gray-500"
+        >
+          <LogOut size={20} /> Sign out
+        </button>
+      </aside>
+
+      <main className="flex-1 p-6 md:p-10">
+        <header className="flex justify-between items-center mb-8">
+          <div>
+            <p className="text-gray-500">CareCircle / {tab}</p>
+            <h1 className="text-3xl font-bold mt-1">
+              {tab === 'dashboard'
+                ? 'Your Health Dashboard'
+                : navItems.find(n => n.id === tab)?.label}
+            </h1>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold">{user.full_name}</p>
+            <p className="text-sm text-gray-500 capitalize">
+              {user.role}
+            </p>
+          </div>
+        </header>
+
+        {tab === 'dashboard' && (
+          <>
+            <section className="bg-emerald-800 text-white rounded-2xl p-8 mb-8">
+              <p className="text-emerald-100">Welcome back,</p>
+              <h2 className="text-3xl font-bold mt-2">
+                {user.full_name}
+              </h2>
+              <p className="mt-3 text-emerald-100">
+                Your care information in one place.
+              </p>
+            </section>
+
+            <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+              <StatCard
+                icon={Pill}
+                title="Medications"
+                value={medications.length}
+                description="Registered medications"
+              />
+              <StatCard
+                icon={Activity}
+                title="Care Profile"
+                value={profile ? 'Active' : 'Not created'}
+                description="Personal health information"
+              />
+              <StatCard
+                icon={CalendarDays}
+                title="Appointments"
+                value="0"
+                description="Upcoming appointments"
+              />
+            </section>
+
+            <section className="bg-white rounded-xl p-6 shadow-sm">
+              <h2 className="text-xl font-bold mb-5">
+                Your Medications
+              </h2>
+
+              {medications.length === 0 ? (
+                <p className="text-gray-500">
+                  No medications have been added yet.
+                </p>
+              ) : (
+                medications.map(med => (
+                  <div
+                    key={med.id}
+                    className="border-b py-4 flex justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold">{med.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {med.dosage} · {med.frequency}
+                      </p>
+                    </div>
+                    <Pill className="text-emerald-700" />
+                  </div>
+                ))
+              )}
+            </section>
+          </>
+        )}
+
+        {tab === 'medications' && (
+          <section className="bg-white rounded-xl p-6 shadow-sm">
+            <h2 className="text-xl font-bold mb-5">
+              Medication Management
+            </h2>
+
+            {medications.length === 0 ? (
+              <p className="text-gray-500">No medications found.</p>
+            ) : (
+              medications.map(med => (
+                <div
+                  key={med.id}
+                  className="border rounded-lg p-4 mb-3"
+                >
+                  <h3 className="font-bold">{med.name}</h3>
+                  <p className="text-gray-500">
+                    {med.dosage} · {med.frequency}
+                  </p>
+                  <p className="text-sm mt-2">
+                    {med.instructions || 'No additional instructions'}
+                  </p>
+                </div>
+              ))
+            )}
+          </section>
+        )}
+
+        {tab === 'health' && <HealthRecords />}
+
+        {tab === 'appointments' && <Appointments />}
+      </main>
+    </div>
+  )
+}
+
+function StatCard({ icon: Icon, title, value, description }) {
+  return (
+    <div className="bg-white rounded-xl p-6 shadow-sm">
+      <Icon className="text-emerald-700 mb-4" size={26} />
+      <p className="text-gray-500">{title}</p>
+      <p className="text-2xl font-bold mt-1">{value}</p>
+      <p className="text-sm text-gray-400 mt-1">{description}</p>
     </div>
   )
 }
